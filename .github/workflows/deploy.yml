@@ -5,7 +5,7 @@
 # Repository secrets (Settings > Secrets and variables > Actions):
 #   CLOUDFLARE_API_TOKEN   account token with Workers Scripts, Workers Routes,
 #                          D1, KV, R2, Vectorize, AI and Browser Rendering edit
-#   CLOUDFLARE_ACCOUNT_ID  the RaptorLabs account id
+#   CLOUDFLARE_ACCOUNT_ID  the id of the Cloudflare account that runs RugHawk
 name: Deploy
 
 on:
