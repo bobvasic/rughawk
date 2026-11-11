@@ -308,6 +308,109 @@ body {
   }
 }
 
+/*
+ * Logo (components/Logo.tsx): the hawk mark on a dark tile. The mark was
+ * drawn with a Gemini image model and traced into the two paths below, which
+ * the page uses as masks: the body over a crimson gradient and the star-shaped
+ * eye over white. app/icon.svg and public/favicon.svg carry the same paths as
+ * a still image. Four things move, each a transform or an opacity so the
+ * compositor does the work: a glint travels around the tile's frame, a band
+ * of light crosses the mark, the eye flashes and the glow behind the mark
+ * breathes. Reduced-motion users get the still logo with the glint at rest.
+ */
+.hawk-logo {
+  --hawk-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M3.4 66.3C0.2 55.8 0.2 46.2 3.5 36.3C12.4 9.7 41.2 -4.4 66.8 5.3C73 7.7 80.4 12.3 81.6 14.5C83.2 17.8 83 21.3 80.8 24.8L80.3 25.7L79.4 25.2C72 20.4 62 17.7 52.4 18C30.3 18.6 11.1 33.9 5.5 55.4C4.7 58.6 4.4 60.5 4 66.4L3.9 67.9L3.4 66.3ZM2.3 95C2.9 78.3 10.8 62.8 24 52.1C34.3 43.9 46.7 39.2 59.8 38.6C61.2 38.5 61.5 38.5 61.2 38.7C56.3 41 54.9 41.6 53.6 42.3C38.6 50.3 26.7 60.6 18.5 72.6L17.5 74.2L18.4 73.1C23.7 67.1 31.4 60.7 38.3 56.3C42.9 53.5 50.3 49.7 54 48.4C54.4 48.3 54.4 48.3 54.1 48.5C48.8 53.1 42.5 60.9 36.7 70.4C36.5 70.7 35.2 71.8 33.7 73C27.3 78.1 18.4 85 11.6 90.4C7.5 93.6 3.7 96.6 3.2 97L2.2 97.8L2.3 95ZM39.3 87.7C37.8 82.3 36.6 77.8 36.6 77.7C36.6 77.2 40.7 70.2 42.7 67.2C49.9 56.4 55.8 50.7 63.9 46.7C69.4 44 74 42.9 80 42.9C82.8 42.9 85.1 43.2 86.9 43.7L87.7 43.9L86.8 44C85.4 44.2 82 45.1 80 45.8C66.6 50.7 54.4 65 46.2 85.4C45.3 87.7 42.7 95.2 42.4 96.7C42.2 97.2 42.1 97.6 42.1 97.6C42 97.6 40.8 93.1 39.3 87.7ZM94.5 50.6C94.5 49.3 93.9 47.1 93.2 45.6C90.6 40.1 82.6 38.5 69.8 40.8C66.8 41.3 62.4 42.4 59.8 43.3C58.7 43.6 57.8 43.9 57.8 43.9C57.8 43.8 58.3 43.6 59 43.3C61.5 42.3 65.5 40.4 68.1 38.9C77 34.1 82.3 29.2 84.8 23.7C85 23.3 85.3 22.9 85.4 22.9C85.8 22.9 90.1 25.2 91.4 26.1C93.9 27.9 96.2 30.4 97.3 32.6C99.6 36.9 99.6 42.4 97.2 47.2C96.7 48.2 94.7 51.4 94.5 51.4C94.5 51.4 94.5 51 94.5 50.6Z'/%3E%3C/svg%3E");
+  --hawk-eye: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M62.5 29.9C61.6 28.5 58.9 26.5 56.3 25.3C54.9 24.6 54.5 24.3 55.1 24.3C56.1 24.3 60.8 22.8 62.1 22C62.5 21.8 62.8 21.7 62.9 21.8C62.9 21.9 63.3 22.2 63.6 22.6C64.3 23.6 66 24.9 67.5 25.7L68.7 26.3L67.9 26.6C66.7 27 64.9 28.2 63.9 29.2C62.7 30.4 62.8 30.3 62.5 29.9Z'/%3E%3C/svg%3E");
+  position: relative;
+  display: inline-block;
+  flex: none;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 28%;
+  background: #272a35;
+  box-shadow: 0 5px 16px -6px rgba(226, 74, 74, 0.55);
+  transition: transform 0.3s ease;
+}
+a:hover > .hawk-logo {
+  transform: scale(1.07);
+}
+/* The glint: a conic gradient twice the tile's size turns behind the face, and only the 1px frame shows it. */
+.hawk-logo::before {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  background: conic-gradient(transparent 0deg 240deg, rgba(214, 59, 59, 0.55) 300deg, rgb(255, 170, 170) 350deg, transparent 360deg);
+  animation: hawk-logo-turn 7s linear infinite;
+}
+/* The face of the tile. */
+.hawk-logo::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  background: radial-gradient(120% 120% at 30% 0%, #1d1f2c 0%, #0d0f16 55%, #05060a 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+.hawk-logo__halo,
+.hawk-logo__mark,
+.hawk-logo__eye {
+  position: absolute;
+  z-index: 1;
+}
+/* Two glows behind the mark: a small one under the eye and a wide one under the body. */
+.hawk-logo__halo {
+  inset: 0;
+  background: radial-gradient(13% 13% at 59.5% 32.7%, rgba(255, 130, 140, 0.7), transparent),
+    radial-gradient(58% 58% at 50% 56%, rgba(226, 74, 74, 0.5), transparent 72%);
+  animation: hawk-logo-breathe 4.2s ease-in-out infinite;
+}
+.hawk-logo__mark,
+.hawk-logo__eye {
+  inset: 14% 13% 14% 15%;
+  mask: var(--hawk-mark) center / contain no-repeat;
+}
+.hawk-logo__mark {
+  background: linear-gradient(152deg, #ffa3ab 0%, #ff4d5e 32%, #d63b3b 64%, #8e0f18 100%);
+}
+/* The band of light; the mark's mask clips it to the mark. */
+.hawk-logo__mark::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(112deg, transparent 32%, rgba(255, 255, 255, 0.92) 50%, transparent 68%);
+  transform: translateX(-115%);
+  animation: hawk-logo-shine 6s ease-in-out 1s infinite;
+}
+.hawk-logo__eye {
+  mask-image: var(--hawk-eye);
+  background: #fff;
+  transform-origin: 61.8% 26%;
+  animation: hawk-logo-flash 3.6s ease-in-out infinite;
+}
+@keyframes hawk-logo-turn {
+  to { transform: rotate(360deg); }
+}
+@keyframes hawk-logo-breathe {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+@keyframes hawk-logo-shine {
+  0% { transform: translateX(-115%); }
+  24%, 100% { transform: translateX(115%); }
+}
+@keyframes hawk-logo-flash {
+  0%, 62%, 100% { opacity: 0.85; transform: scale(1); }
+  76% { opacity: 1; transform: scale(1.55); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hawk-logo::before,
+  .hawk-logo__halo,
+  .hawk-logo__mark::after,
+  .hawk-logo__eye {
+    animation: none;
+  }
+}
+
 .chip {
   @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider;
 }
