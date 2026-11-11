@@ -9,21 +9,29 @@
  *                      choice for index-heavy methods. The QuickNode account
  *                      cap is 50 rps shared with Solmint's production
  *                      endpoints, so RugHawk budgets 20 rps here by default.
- *   ANKR_RPC_URL       hot-state node. Measured 2026-10-08: same latency as
- *                      QuickNode on account reads and recent transactions, but
- *                      it keeps roughly 14 hours of ledger (an older getBlock
- *                      answers -32001 "cleaned up", getTransaction answers
- *                      null, getSignaturesForAddress answers [] for an old
- *                      wallet) and getTokenLargestAccounts took 13 to 20+ s.
- *                      It shares current-state traffic 50/50 with QuickNode
- *                      and takes recent transactions, never a history walk.
+ *   GETBLOCK_RPC_URL   hot-state node (GetBlock shared node, Full mode,
+ *                      Frankfurt). Measured 2026-11-11: account reads and
+ *                      recent transactions match QuickNode in content, speed
+ *                      and slot height. It keeps roughly 10 hours of ledger:
+ *                      an older getBlock answers -32001 "cleaned up" and
+ *                      getSignaturesForAddress answers only the signatures
+ *                      inside the window, with no error. On large mints
+ *                      getTokenLargestAccounts ran past 30 s. Its plan allows
+ *                      800 rps, so it carries three of every four
+ *                      current-state reads and recent transactions and leaves
+ *                      QuickNode's shared cap for the work only an archive
+ *                      node can do. Never a history walk, and a heavy method
+ *                      only as failover.
+ *   ANKR_RPC_URL       the earlier hot-state node, still honoured where the
+ *                      secret is set (same limits, about 14 hours of ledger).
  *   HELIUS_RPC_URL     optional failover (treated as archival)
  *   public cluster     last resort (rate-limits hard and 403s Cloudflare egress)
  *
  * Routing by method class (see methodClass):
  *   state    account, balance, supply, blockhash and fee reads, simulate:
  *            balanced across every provider with weight > 0. The provider
- *            with budget to spare answers; round robin when both have it.
+ *            with budget to spare answers; when several have it they take
+ *            turns in proportion to their weight.
  *   history  getSignaturesForAddress and other ledger walks: archive providers
  *            only. A silently short answer from a pruned node would become a
  *            "fresh wallet" or "launch not found" finding.
@@ -45,7 +53,7 @@ export interface RpcUpstream {
   url: string;
   /** Serves the full ledger (any slot). Hot nodes only keep recent blocks. */
   archive: boolean;
-  /** Share of balanced traffic; 0 means failover only. */
+  /** Share of balanced traffic (turns per round, a whole number); 0 means failover only. */
   weight: number;
   /** Requests per second RugHawk may spend on this provider (per isolate). */
   rate: number;
@@ -77,6 +85,7 @@ export function rpcUpstreams(env: Env): RpcUpstream[] {
     if (typeof value === 'string' && value.startsWith('http')) chain.push({ name, url: value, ...shape });
   };
   add('quicknode', env.QUICKNODE_RPC_URL, { archive: true, weight: 1, rate: rateFrom(env.QUICKNODE_RPC_RPS, 20) });
+  add('getblock', env.GETBLOCK_RPC_URL, { archive: false, weight: 3, rate: rateFrom(env.GETBLOCK_RPC_RPS, 100) });
   add('ankr', env.ANKR_RPC_URL, { archive: false, weight: 1, rate: rateFrom(env.ANKR_RPC_RPS, 20) });
   add('helius', env.HELIUS_RPC_URL, { archive: true, weight: 0, rate: 10 });
   chain.push({ name: 'public', url: PUBLIC_MAINNET_RPC, archive: false, weight: 0, rate: 2 });
@@ -93,11 +102,11 @@ export function providerRole(u: Pick<RpcUpstream, 'archive' | 'weight'>): RpcRol
   return u.weight > 0 ? (u.archive ? 'archive' : 'hot') : 'failover';
 }
 
-const PROVIDER_NAMES = /\b(?:quicknode|quiknode|ankr|helius)\b/gi;
+const PROVIDER_NAMES = /\b(?:quicknode|quiknode|getblock|ankr|helius)\b/gi;
 
-/** Error text safe to send to a client: endpoint URLs and provider names removed. */
+/** Error text safe to send to a client: endpoint URLs and provider names removed (the RPC method getBlock is not a name). */
 export function publicRpcDetail(message: string): string {
-  return message.replace(/https?:\/\/\S+/g, '[endpoint]').replace(PROVIDER_NAMES, 'rpc').slice(0, 200);
+  return message.replace(/https?:\/\/\S+/g, '[endpoint]').replace(PROVIDER_NAMES, (m) => (m === 'getBlock' ? m : 'rpc')).slice(0, 200);
 }
 
 export type MethodClass = 'state' | 'history' | 'recent' | 'heavy' | 'submit';
@@ -200,11 +209,12 @@ export function noteFailure(u: RpcUpstream, ms = 10_000): void {
   s.cooldownUntil = Math.max(s.cooldownUntil, Date.now() + ms);
 }
 
-/** Round robin among the candidates that can start a request now; the rest follow as failover. */
+/** Weighted round robin among the candidates that can start a request now; the rest follow as failover. */
 function pick(cands: RpcUpstream[]): RpcUpstream[] {
   const ready = cands.filter((u) => stateFor(u).budget.available() >= 1);
   const base = ready.length ? ready : [...cands].sort((a, b) => stateFor(a).budget.queued - stateFor(b).budget.queued);
-  const chosen = base[roundRobin++ % base.length];
+  const turns = base.flatMap((u) => Array<RpcUpstream>(u.weight).fill(u));
+  const chosen = turns[roundRobin++ % turns.length];
   return [chosen, ...cands.filter((u) => u !== chosen)];
 }
 

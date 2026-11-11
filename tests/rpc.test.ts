@@ -1,10 +1,13 @@
 import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { SolanaRpc, methodClass, providerRole, publicRpcDetail, relayOrder, resetRpcState, rpcUpstreams } from '../lib/rpc';
+import { RpcError, SolanaRpc, methodClass, providerRole, publicRpcDetail, relayOrder, resetRpcState, rpcUpstreams } from '../lib/rpc';
+import { guarded } from '../lib/scan/context';
 
 const QN = 'https://qn.example/';
 const AN = 'https://ankr.example/';
+const GB = 'https://getblock.example/';
 const env = { QUICKNODE_RPC_URL: QN, ANKR_RPC_URL: AN, QUICKNODE_RPC_RPS: '1000', ANKR_RPC_RPS: '1000' };
+const gbEnv = { QUICKNODE_RPC_URL: QN, GETBLOCK_RPC_URL: GB, QUICKNODE_RPC_RPS: '1000', GETBLOCK_RPC_RPS: '1000' };
 
 type Reply = { result?: unknown; error?: { code: number; message: string }; status?: number };
 type Handler = (method: string, params: unknown[]) => Reply;
@@ -157,4 +160,59 @@ test('rpc: relay order alternates state batches and pins history and submission'
   assert.equal(relayOrder(ups, ['getLatestBlockhash', 'sendTransaction'])[0].name, 'quicknode');
   assert.deepEqual(relayOrder(ups, ['getSignaturesForAddress']).map((u) => u.name), ['quicknode']);
   assert.deepEqual(relayOrder(ups, ['getBalance']).map((u) => u.name), ['quicknode', 'ankr', 'public']);
+});
+
+test('rpc: GetBlock is the hot provider and carries three of every four balanced calls', async () => {
+  const ups = rpcUpstreams(gbEnv);
+  assert.deepEqual(ups.map((u) => [u.name, u.archive, u.weight]), [['quicknode', true, 1], ['getblock', false, 3], ['public', false, 0]]);
+  assert.deepEqual(ups.map(providerRole), ['archive', 'hot', 'failover']);
+  assert.equal(rpcUpstreams({ GETBLOCK_RPC_URL: GB }).find((u) => u.name === 'getblock')?.rate, 100);
+  assert.deepEqual(rpcUpstreams({ ...gbEnv, ANKR_RPC_URL: AN }).map((u) => u.name), ['quicknode', 'getblock', 'ankr', 'public']);
+  const log: LogEntry[] = [];
+  const rpc = new SolanaRpc(ups, { fetchImpl: fakeFetch({ [QN]: () => ({ result: 'qn' }), [GB]: () => ({ result: 'gb' }) }, log) });
+  for (let i = 0; i < 20; i++) await rpc.call('getAccountInfo', ['x']);
+  assert.deepEqual(rpc.snapshot(), { quicknode: 5, getblock: 15 });
+  assert.deepEqual(rpc.rolesSince({}), { archive: 5, hot: 15 });
+  resetRpcState();
+  assert.deepEqual(Array.from({ length: 4 }, () => relayOrder(ups, ['getLatestBlockhash'])[0].name), ['quicknode', 'getblock', 'getblock', 'getblock']);
+});
+
+test('rpc: with GetBlock, history walks, heavy methods and submission still start on the archive provider', async () => {
+  const ups = rpcUpstreams(gbEnv);
+  const log: LogEntry[] = [];
+  const rpc = new SolanaRpc(ups, { fetchImpl: fakeFetch({ [QN]: () => ({ result: [] }), [GB]: hot(10_000, () => ({ result: [] })) }, log) });
+  await rpc.signatureHistory('wallet', 1);
+  await rpc.call('getTokenLargestAccounts', ['mint']);
+  await rpc.call('sendTransaction', ['tx']);
+  await rpc.getTransaction('old', 5_000); // below the hot window
+  assert.deepEqual(log.filter((l) => l.method !== 'getFirstAvailableBlock').map((l) => l.url), [QN, QN, QN, QN]);
+  assert.equal(relayOrder(ups, ['getLatestBlockhash', 'sendTransaction'])[0].name, 'quicknode');
+  assert.deepEqual(relayOrder(ups, ['getSignaturesForAddress']).map((u) => u.name), ['quicknode']);
+});
+
+test('rpc: recent transactions inside the GetBlock window follow the same three to one split, and its null is re-checked', async () => {
+  const log: LogEntry[] = [];
+  let gbTx: unknown = tx(1);
+  const rpc = new SolanaRpc(rpcUpstreams(gbEnv), {
+    fetchImpl: fakeFetch({ [QN]: () => ({ result: tx(0) }), [GB]: hot(10_000, () => ({ result: gbTx })) }, log),
+  });
+  for (let i = 0; i < 8; i++) await rpc.getTransaction('recent', 50_000);
+  assert.equal(of(log, GB, 'getTransaction'), 6);
+  assert.equal(of(log, QN, 'getTransaction'), 2);
+  gbTx = null;
+  log.length = 0;
+  await rpc.call('getAccountInfo', ['x']); // the next turn is GetBlock's
+  assert.deepEqual(await rpc.getTransaction('pruned', 50_000), tx(0));
+  assert.deepEqual(log.filter((l) => l.method === 'getTransaction').map((l) => l.url), [GB, QN]);
+});
+
+test('rpc: the GetBlock name and endpoint never reach public output, including partial markers in reports', async () => {
+  assert.equal(publicRpcDetail('getblock answered 502'), 'rpc answered 502');
+  assert.equal(publicRpcDetail('GetBlock: Block 5 cleaned up, does not exist on node'), 'rpc: Block 5 cleaned up, does not exist on node');
+  assert.equal(publicRpcDetail('fetch failed https://shared.eu-central-1.getblock.io/secret-token'), 'fetch failed [endpoint]');
+  assert.equal(publicRpcDetail('getblock: All RPC providers failed for getBlock'), 'rpc: All RPC providers failed for getBlock');
+  const partial: string[] = [];
+  await guarded(partial, 'launch', async () => { throw new RpcError('getblock rate limited', 429, 'getblock'); }, null);
+  await guarded(partial, 'holders', async () => { throw new RpcError('quicknode answered 502', 502, 'quicknode'); }, null);
+  assert.deepEqual(partial, ['launch: rpc rate limited', 'holders: rpc answered 502']);
 });

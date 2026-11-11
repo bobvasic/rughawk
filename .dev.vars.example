@@ -1,15 +1,18 @@
 # Local development secrets (copy to .dev.vars, which is gitignored).
 # Both providers run side by side (lib/rpc.ts): QuickNode is the archive node
-# (history walks, heavy index methods, half of the state reads); Ankr is the
-# hot-state node (the other half of the state reads and recent transactions).
+# (history walks, heavy index methods, a share of the state reads); GetBlock is
+# the hot-state node (most of the state reads and recent transactions).
 # RugHawk QuickNode Solana mainnet endpoint (QuickNode dashboard, endpoint 672714, label RugHawk).
 QUICKNODE_RPC_URL=https://YOUR-ENDPOINT.solana-mainnet.quiknode.pro/YOUR-TOKEN/
-# Ankr Solana mainnet endpoint (Ankr dashboard, premium key).
-ANKR_RPC_URL=https://rpc.ankr.com/solana/YOUR-KEY
+# GetBlock Solana mainnet endpoint (GetBlock dashboard, Shared RPC, API interface JSON-RPC, Full mode).
+GETBLOCK_RPC_URL=https://shared.eu-central-1.getblock.io/YOUR-TOKEN
+# Optional: the earlier hot-state node (Ankr), used alongside when set
+# ANKR_RPC_URL=https://rpc.ankr.com/solana/YOUR-KEY
 # Optional failover
 # HELIUS_RPC_URL=
-# Optional per-isolate request budgets, requests per second (default 20 each)
+# Optional per-isolate request budgets, requests per second (default 20, GetBlock 100)
 # QUICKNODE_RPC_RPS=20
+# GETBLOCK_RPC_RPS=100
 # ANKR_RPC_RPS=20
 # Protects /api/admin/* and the Watchtower cron
 ADMIN_TOKEN=change-me

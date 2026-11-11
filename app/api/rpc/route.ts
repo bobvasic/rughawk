@@ -8,8 +8,9 @@ export const dynamic = 'force-dynamic';
  * POST /api/rpc: Solana JSON-RPC relay for the browser wallet flow (Shield
  * revoke/close transactions). Endpoint tokens stay server-side. Only the
  * methods a wallet transaction needs are relayed, so the paid endpoints cannot
- * be used as a free indexer. State reads alternate between QuickNode and Ankr;
- * a batch that submits a transaction goes to QuickNode first (lib/rpc.ts).
+ * be used as a free indexer. State reads are shared between the archive and
+ * hot-state providers; a batch that submits a transaction goes to the archive
+ * provider first (lib/rpc.ts).
  */
 const ALLOWED = new Set([
   'getLatestBlockhash', 'sendTransaction', 'simulateTransaction', 'getSignatureStatuses', 'getBalance',

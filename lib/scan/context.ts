@@ -1,4 +1,4 @@
-import { SolanaRpc } from '../rpc';
+import { SolanaRpc, publicRpcDetail } from '../rpc';
 
 /**
  * Minimal cache contract, satisfied by Workers KV in production and by an
@@ -53,12 +53,12 @@ export async function cached<T>(ctx: ScanContext, key: string, ttlSeconds: numbe
   return value;
 }
 
-/** Run a module, recording a partial-result marker instead of failing the scan. */
+/** Run a module, recording a partial-result marker (shown in the report, so no provider names) instead of failing the scan. */
 export async function guarded<T>(partial: string[], name: string, fn: () => Promise<T>, fallback: T): Promise<T> {
   try {
     return await fn();
   } catch (e) {
-    partial.push(`${name}: ${e instanceof Error ? e.message.slice(0, 120) : 'failed'}`);
+    partial.push(`${name}: ${e instanceof Error ? publicRpcDetail(e.message).slice(0, 120) : 'failed'}`);
     return fallback;
   }
 }
