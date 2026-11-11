@@ -38,11 +38,11 @@
   ],
 
   // Report cache, metadata JSON, RDAP and first-funding lookups.
-  "kv_namespaces": [{ "binding": "CACHE", "id": "2cce5391ef7049b18e36587950e4b1d3" }],
+  "kv_namespaces": [{ "binding": "CACHE", "id": "e4d3e63739f14ec08cbd21ca7ef8cc36" }],
 
   // Scan history, deployer linkage, feed, watchlist, alerts.
   "d1_databases": [
-    { "binding": "DB", "database_name": "rughawk-db", "database_id": "2e0e05f9-f02d-4c57-971d-edb5d1d8c89a" }
+    { "binding": "DB", "database_name": "rughawk-db", "database_id": "01024d0e-6ab9-4c93-a4cc-370974725233" }
   ],
 
   // Scam DNA: 768-dim bge-base-en-v1.5 embeddings of every token's identity.
