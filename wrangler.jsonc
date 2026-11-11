@@ -78,13 +78,16 @@
 
   // Secrets (never in this file): npx wrangler secret put <NAME>
   //   QUICKNODE_RPC_URL   RugHawk QuickNode endpoint 672714. Archive node: all
-  //                       history walks, heavy index methods, half of the
-  //                       state reads (lib/rpc.ts).
-  //   ANKR_RPC_URL        Ankr Solana endpoint. Hot-state node: the other half
-  //                       of the state reads and recent transactions (keeps
-  //                       about 14 hours of ledger, never a history walk).
+  //                       history walks, heavy index methods, transaction
+  //                       submission and a share of the state reads (lib/rpc.ts).
+  //   GETBLOCK_RPC_URL    GetBlock Solana JSON-RPC endpoint (shared node, Full
+  //                       mode, https URL). Hot-state node: three of every
+  //                       four state reads and recent transactions (keeps
+  //                       about 10 hours of ledger, never a history walk).
+  //   ANKR_RPC_URL        optional, the earlier hot-state node; used where set
   //   HELIUS_RPC_URL      optional failover
-  // Optional vars: QUICKNODE_RPC_RPS / ANKR_RPC_RPS, per-isolate budgets (default 20).
+  // Optional vars: QUICKNODE_RPC_RPS / GETBLOCK_RPC_RPS / ANKR_RPC_RPS,
+  // per-isolate budgets in requests per second (default 20, GetBlock 100).
   //   ADMIN_TOKEN         protects /api/admin/*
   //   CRON_SECRET         authenticates the Watchtower cron call
   //   SESSION_SECRET      signs the wallet session cookie
